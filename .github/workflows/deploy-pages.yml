@@ -31,8 +31,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Prepare Dataset
+        run: node scripts/build-dataset.mjs --audio-license-policy commercial-safe
+
       - name: Build
-        run: npm run build
+        run: npx vite build
 
       - name: Deploy To Cloudflare Pages
         id: deploy

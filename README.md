@@ -68,6 +68,7 @@ npm run build
 
 ```json
 {
+  "audioLicensePolicy": "commercial-safe",
   "sources": {
     "translationPairsSource": "path/to/ru-ja-pairs.tsv",
     "audioSource": "path/to/sentences_with_audio.csv",
@@ -80,6 +81,16 @@ npm run build
 
 `translationPairsSource` を指定した場合は、自動検出や weekly export より優先されます。
 
+`audioLicensePolicy` は以下を指定できます。
+
+- `all`
+  - ライセンス空欄や再利用条件不明を含む全音声を使います
+- `reusable`
+  - ライセンスが明記されている音声のみを使います
+- `commercial-safe`
+  - `CC0 / CC BY / CC BY-SA` 系の音声のみを使います
+  - 公開サイト向けの安全寄り設定です
+
 `alphabetAudioDir` には、以下のいずれかのファイル名で 33 文字分を置けます。
 
 - `01.ogg` から `33.ogg`
@@ -89,6 +100,7 @@ CLI 例:
 
 ```bash
 node scripts/build-dataset.mjs \
+  --audio-license-policy commercial-safe \
   --translation-source "./例文の組み合わせ ロシア語-日本語 - 2026-04-13.tsv" \
   --audio-source "./sentences_with_audio.csv"
 ```
@@ -118,7 +130,7 @@ node scripts/build-dataset.mjs --force-download
 
 ## Deploy
 
-`main` への push で Cloudflare Pages へ自動デプロイする GitHub Actions を `.github/workflows/deploy-pages.yml` に用意しています。
+`main` への push で Cloudflare Pages へ自動デプロイする GitHub Actions を `.github/workflows/deploy-pages.yml` に用意しています。公開デプロイでは `audioLicensePolicy=commercial-safe` を明示しています。
 
 この workflow で必要な GitHub Secrets:
 

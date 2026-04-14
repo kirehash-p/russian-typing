@@ -1,5 +1,6 @@
 {
   "cacheDir": ".cache/build-dataset",
+  "audioLicensePolicy": "commercial-safe",
   "forceDownload": false,
   "sources": {
     "translationPairsSource": "",

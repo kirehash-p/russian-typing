@@ -34,6 +34,7 @@ const AUTO_TRANSLATION_SOURCE_DIRS = [
 
 const DEFAULT_CONFIG = {
   cacheDir: path.join(".cache", "build-dataset"),
+  audioLicensePolicy: "commercial-safe",
   forceDownload: false,
   sources: {
     translationPairsSource: "",
@@ -46,6 +47,12 @@ const DEFAULT_CONFIG = {
     audioArchive: "https://downloads.tatoeba.org/exports/sentences_with_audio.tar.bz2",
     alphabetAudioDir: ""
   }
+};
+
+const AUDIO_LICENSE_POLICY_DESCRIPTIONS = {
+  all: "すべての音声を使用します。ライセンス空欄や再利用条件不明の音声も含みます。",
+  reusable: "ライセンスが明記されている音声のみを使用します。NC や ND を含む場合があります。",
+  "commercial-safe": "CC0 / CC BY / CC BY-SA 系の音声のみを使用します。公開サイト向けの安全寄り設定です。"
 };
 
 const ALPHABET_AUDIO_MANIFEST = [
@@ -183,6 +190,7 @@ const CHAR_TO_KEY = new Map([
 function parseArgs(argv) {
   const args = {
     configPath: DEFAULT_CONFIG_PATH,
+    audioLicensePolicy: "",
     forceDownload: false,
     overrides: {}
   };
@@ -197,6 +205,11 @@ function parseArgs(argv) {
     }
     if (token === "--force-download") {
       args.forceDownload = true;
+      continue;
+    }
+    if (token === "--audio-license-policy" && next) {
+      args.audioLicensePolicy = next;
+      index += 1;
       continue;
     }
     if (token === "--translation-source" && next) {
@@ -303,6 +316,10 @@ function mergeConfig(baseConfig, fileConfig, cliArgs) {
   return {
     ...baseConfig,
     ...fileConfig,
+    audioLicensePolicy:
+      cliArgs.audioLicensePolicy ||
+      fileConfig.audioLicensePolicy ||
+      baseConfig.audioLicensePolicy,
     forceDownload: baseConfig.forceDownload || fileConfig.forceDownload || cliArgs.forceDownload,
     sources: {
       ...baseConfig.sources,
@@ -383,6 +400,57 @@ function isTypeable(text) {
   }
 
   return true;
+}
+
+function normalizeAudioLicensePolicy(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "all") {
+    return "all";
+  }
+  if (normalized === "reusable" || normalized === "licensed") {
+    return "reusable";
+  }
+  if (
+    normalized === "commercial-safe" ||
+    normalized === "commercial_safe" ||
+    normalized === "safe"
+  ) {
+    return "commercial-safe";
+  }
+  throw new Error(
+    `Unsupported audioLicensePolicy: ${value}. Expected one of: all, reusable, commercial-safe`
+  );
+}
+
+function isReusableAudioLicense(license) {
+  return Boolean(license && license !== "\\N");
+}
+
+function isCommercialSafeAudioLicense(license) {
+  if (!isReusableAudioLicense(license)) {
+    return false;
+  }
+  return (
+    license === "CC0 1.0" ||
+    license === "CC BY 2.0 FR" ||
+    license.startsWith("CC BY ") ||
+    license.startsWith("CC BY-SA ")
+  );
+}
+
+function isAudioAllowedByPolicy(policy, license) {
+  if (policy === "all") {
+    return true;
+  }
+  if (policy === "reusable") {
+    return isReusableAudioLicense(license);
+  }
+  if (policy === "commercial-safe") {
+    return isCommercialSafeAudioLicense(license);
+  }
+  return false;
 }
 
 async function downloadFile(url, destinationPath, { retries = 5, timeoutMs = 600000 } = {}) {
@@ -486,7 +554,7 @@ function buildSentenceRecord(id, originalText) {
     typingText,
     exactTypingText,
     translations: new Set(),
-    audioIds: new Set()
+    audioOptions: new Map()
   };
 }
 
@@ -604,7 +672,7 @@ async function buildSentenceMapFromWeeklyExports(sentencesPath, linksPath) {
   return sentenceMap;
 }
 
-async function attachAudio(sentenceMap, audioPath) {
+async function attachAudio(sentenceMap, audioPath, policy) {
   if (!audioPath) {
     return;
   }
@@ -620,15 +688,28 @@ async function attachAudio(sentenceMap, audioPath) {
       continue;
     }
 
-    const [sentenceId, audioId] = line.split("\t");
+    const [sentenceId, audioId, username = "", license = "", attributionUrl = ""] = line.split("\t");
     if (!sentenceId || !audioId) {
       continue;
     }
 
     const entry = sentenceMap.get(sentenceId);
-    if (entry) {
-      entry.audioIds.add(audioId);
+    if (!entry) {
+      continue;
     }
+
+    const normalizedLicense = license.trim();
+    if (!isAudioAllowedByPolicy(policy, normalizedLicense)) {
+      continue;
+    }
+
+    entry.audioOptions.set(audioId, {
+      kind: "tatoeba",
+      id: audioId,
+      username: username.trim(),
+      license: normalizedLicense,
+      attributionUrl: attributionUrl.trim()
+    });
   }
 }
 
@@ -679,7 +760,7 @@ async function prepareAlphabetAudio(config) {
 
 function finalizeRecords(sentenceMap) {
   return [...sentenceMap.values()]
-    .filter((entry) => entry.audioIds.size > 0 && entry.translations.size > 0)
+    .filter((entry) => entry.audioOptions.size > 0 && entry.translations.size > 0)
     .sort((left, right) => Number(left.id) - Number(right.id))
     .map((entry) => ({
       id: entry.id,
@@ -687,7 +768,9 @@ function finalizeRecords(sentenceMap) {
       typingText: entry.typingText,
       exactTypingText: entry.exactTypingText,
       translations: [...entry.translations],
-      audioIds: [...entry.audioIds]
+      sentencePageUrl: `https://tatoeba.org/en/sentences/show/${entry.id}`,
+      audios: [...entry.audioOptions.values()],
+      audioIds: [...entry.audioOptions.keys()]
     }));
 }
 
@@ -849,6 +932,7 @@ async function downloadTatoebaCustomExport(config, cacheDir) {
 }
 
 async function buildSentenceDataset(config, cacheDir) {
+  const audioLicensePolicy = normalizeAudioLicensePolicy(config.audioLicensePolicy);
   const translationPairsSource =
     config.sources.translationPairsSource || findAutoTranslationPairsSource();
 
@@ -870,9 +954,10 @@ async function buildSentenceDataset(config, cacheDir) {
       }
     );
     const sentenceMap = await loadCustomTranslationPairs(translationPairsPath);
-    await attachAudio(sentenceMap, audioPath);
+    await attachAudio(sentenceMap, audioPath, audioLicensePolicy);
     return {
       sentenceMap,
+      audioLicensePolicy,
       sourceMode:
         config.sources.translationPairsSource
           ? "custom-translation-pairs"
@@ -891,9 +976,10 @@ async function buildSentenceDataset(config, cacheDir) {
       }
     );
     const sentenceMap = await loadCustomTranslationPairs(translationPairsPath);
-    await attachAudio(sentenceMap, audioPath);
+    await attachAudio(sentenceMap, audioPath, audioLicensePolicy);
     return {
       sentenceMap,
+      audioLicensePolicy,
       sourceMode: "tatoeba-custom-export-api"
     };
   } catch (error) {
@@ -914,9 +1000,10 @@ async function buildSentenceDataset(config, cacheDir) {
   });
 
   const sentenceMap = await buildSentenceMapFromWeeklyExports(sentencesPath, linksPath);
-  await attachAudio(sentenceMap, audioPath);
+  await attachAudio(sentenceMap, audioPath, audioLicensePolicy);
   return {
     sentenceMap,
+    audioLicensePolicy,
     sourceMode: "tatoeba-weekly-exports"
   };
 }
@@ -931,11 +1018,12 @@ async function main() {
   mkdirSync(path.dirname(TSV_OUTPUT), { recursive: true });
   mkdirSync(cacheDir, { recursive: true });
 
-  const [{ sentenceMap, sourceMode }, alphabet] = await Promise.all([
+  const [{ sentenceMap, sourceMode, audioLicensePolicy }, alphabet] = await Promise.all([
     buildSentenceDataset(config, cacheDir),
     prepareAlphabetAudio(config)
   ]);
   const records = finalizeRecords(sentenceMap);
+  const normalizedPolicy = normalizeAudioLicensePolicy(audioLicensePolicy);
 
   writeFileSync(
     JSON_OUTPUT,
@@ -943,6 +1031,29 @@ async function main() {
       {
         generatedAt: new Date().toISOString(),
         sourceMode,
+        licensing: {
+          audioLicensePolicy: normalizedPolicy,
+          audioLicensePolicyDescription:
+            AUDIO_LICENSE_POLICY_DESCRIPTIONS[normalizedPolicy],
+          text: {
+            sourceName: "Tatoeba",
+            sourceUrl: "https://tatoeba.org/en/",
+            licenseName: "CC BY 2.0 FR",
+            licenseUrl: "https://creativecommons.org/licenses/by/2.0/fr/",
+            note: "Tatoeba のテキスト全体は CC BY 2.0 FR として配布され、一部は CC0 1.0 の場合があります。"
+          },
+          audio: {
+            sourceName: "Tatoeba user recordings",
+            faqUrl: "https://en.wiki.tatoeba.org/articles/show/faq",
+            downloadsUrl: "https://tatoeba.org/en/downloads"
+          },
+          alphabet: {
+            sourceName: "Wikimedia Commons",
+            sourceUrl:
+              "https://commons.wikimedia.org/wiki/Category:Pronunciation_of_Russian_alphabet",
+            note: "ロシア語アルファベット音声は Wikimedia Commons の各ファイルページを参照してください。"
+          }
+        },
         totalSentences: records.length,
         totalAlphabetEntries: alphabet.length,
         sentences: records,
@@ -954,7 +1065,15 @@ async function main() {
   );
 
   const tsvRows = [
-    ["ru_sentence_id", "original_text", "typing_text", "exact_typing_text", "ja_translations", "audio_ids"].join("\t"),
+    [
+      "ru_sentence_id",
+      "original_text",
+      "typing_text",
+      "exact_typing_text",
+      "ja_translations",
+      "audio_ids",
+      "audio_licenses"
+    ].join("\t"),
     ...records.map((record) =>
       [
         record.id,
@@ -962,7 +1081,8 @@ async function main() {
         tsvEscape(record.typingText),
         tsvEscape(record.exactTypingText),
         tsvEscape(record.translations.join(" | ")),
-        tsvEscape(record.audioIds.join("|"))
+        tsvEscape(record.audioIds.join("|")),
+        tsvEscape(record.audios.map((audio) => audio.license || "UNSPECIFIED").join("|"))
       ].join("\t")
     )
   ];
@@ -972,6 +1092,7 @@ async function main() {
     JSON.stringify(
       {
         sourceMode,
+        audioLicensePolicy: normalizedPolicy,
         totalSentences: records.length,
         totalAlphabetEntries: alphabet.length,
         jsonOutput: path.relative(ROOT_DIR, JSON_OUTPUT),

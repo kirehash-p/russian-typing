@@ -283,6 +283,7 @@ function saveSettings(settings) {
 
 const state = {
   settings: loadSettings(),
+  datasetMeta: null,
   allSentences: [],
   alphabetEntries: [],
   availableSentenceSources: [],
@@ -406,6 +407,10 @@ app.innerHTML = `
             <span id="progressInfo" class="meta-pill">0 / 0</span>
             <span id="modeInfo" class="meta-pill"></span>
           </div>
+          <details id="licenseDetails" class="license-panel">
+            <summary>ライセンス / 出典</summary>
+            <div id="licenseContent" class="license-content"></div>
+          </details>
         </div>
       </section>
 
@@ -440,6 +445,8 @@ const sentenceDisplayNode = document.querySelector("#sentenceDisplay");
 const translationNode = document.querySelector("#translation");
 const progressInfoNode = document.querySelector("#progressInfo");
 const modeInfoNode = document.querySelector("#modeInfo");
+const licenseDetailsNode = document.querySelector("#licenseDetails");
+const licenseContentNode = document.querySelector("#licenseContent");
 const keyboardNode = document.querySelector("#keyboard");
 const settingAutoReplayNode = document.querySelector("#settingAutoReplay");
 const settingSoundEnabledNode = document.querySelector("#settingSoundEnabled");
@@ -607,11 +614,22 @@ function buildDisplayUnits(displayText, rawSourceText) {
 }
 
 function createSentenceSource(sentence) {
+  const audioChoices =
+    sentence.audios?.length > 0
+      ? sentence.audios
+      : (sentence.audioIds ?? []).map((id) => ({
+          kind: "tatoeba",
+          id,
+          username: "",
+          license: "",
+          attributionUrl: ""
+        }));
+
   return {
     kind: "sentence",
     sentence,
     translation: pickRandom(sentence.translations),
-    audio: sentence.audioIds.length > 0 ? { kind: "tatoeba", id: pickRandom(sentence.audioIds) } : null
+    audio: audioChoices.length > 0 ? pickRandom(audioChoices) : null
   };
 }
 
@@ -625,7 +643,14 @@ function buildAlphabetSourceQueue() {
     entry,
     letter: entry.letter,
     uppercase: Math.random() < 0.35,
-    audio: entry.audioPath ? { kind: "static", path: entry.audioPath } : null
+    audio: entry.audioPath
+      ? {
+          kind: "static",
+          path: entry.audioPath,
+          sourcePageUrl: entry.sourcePageUrl,
+          sourceFileName: entry.sourceFileName
+        }
+      : null
   }));
 }
 
@@ -962,11 +987,137 @@ function renderSettings() {
   alphabetModeBlockNode.hidden = state.settings.practiceMode !== "alphabet";
 }
 
+function createLicenseLink(label, url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.textContent = label;
+  return link;
+}
+
+function appendLicenseLine(container, label, value) {
+  const row = document.createElement("p");
+  row.className = "license-line";
+  const strong = document.createElement("strong");
+  strong.textContent = `${label}: `;
+  row.appendChild(strong);
+  row.append(value);
+  container.appendChild(row);
+}
+
+function renderLicenseInfo() {
+  if (!licenseContentNode || !state.currentChallenge) {
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  const licensing = state.datasetMeta?.licensing;
+
+  if (state.currentChallenge.kind === "sentence") {
+    const textLineValue = document.createDocumentFragment();
+    if (licensing?.text?.sourceUrl) {
+      textLineValue.appendChild(
+        createLicenseLink(licensing.text.sourceName ?? "Tatoeba", licensing.text.sourceUrl)
+      );
+    } else {
+      textLineValue.append(licensing?.text?.sourceName ?? "Tatoeba");
+    }
+    textLineValue.append(` / ${licensing?.text?.licenseName ?? "CC BY 2.0 FR"}`);
+    appendLicenseLine(fragment, "例文", textLineValue);
+
+    if (licensing?.text?.note) {
+      const note = document.createElement("p");
+      note.className = "license-note";
+      note.textContent = licensing.text.note;
+      fragment.appendChild(note);
+    }
+
+    const sentenceLinkValue = document.createDocumentFragment();
+    const sentencePageUrl =
+      state.currentSource?.sentence?.sentencePageUrl ??
+      `https://tatoeba.org/en/sentences/show/${state.currentSource?.sentence?.id ?? ""}`;
+    sentenceLinkValue.appendChild(
+      createLicenseLink(`#${state.currentSource?.sentence?.id ?? ""}`, sentencePageUrl)
+    );
+    appendLicenseLine(fragment, "現在の文", sentenceLinkValue);
+
+    if (licensing?.audioLicensePolicyDescription) {
+      appendLicenseLine(
+        fragment,
+        "音声ポリシー",
+        `${licensing.audioLicensePolicy} / ${licensing.audioLicensePolicyDescription}`
+      );
+    }
+
+    const currentAudio = state.currentChallenge.audio;
+    if (currentAudio?.kind === "tatoeba") {
+      const audioValue = `${currentAudio.username || "Tatoeba user"} / ${
+        currentAudio.license || "ライセンス情報なし"
+      }`;
+      appendLicenseLine(fragment, "音声", audioValue);
+
+      if (currentAudio.attributionUrl) {
+        const audioLinkValue = document.createDocumentFragment();
+        audioLinkValue.appendChild(
+          createLicenseLink("attribution URL", currentAudio.attributionUrl)
+        );
+        appendLicenseLine(fragment, "音声帰属", audioLinkValue);
+      } else if (currentAudio.id) {
+        const audioLinkValue = document.createDocumentFragment();
+        audioLinkValue.appendChild(
+          createLicenseLink(
+            `audio #${currentAudio.id}`,
+            `https://tatoeba.org/audio/download/${currentAudio.id}`
+          )
+        );
+        appendLicenseLine(fragment, "音声参照", audioLinkValue);
+      }
+    }
+  } else {
+    const alphabetValue = document.createDocumentFragment();
+    if (state.currentChallenge.audio?.sourcePageUrl) {
+      alphabetValue.appendChild(
+        createLicenseLink("Wikimedia Commons", state.currentChallenge.audio.sourcePageUrl)
+      );
+    } else if (licensing?.alphabet?.sourceUrl) {
+      alphabetValue.appendChild(
+        createLicenseLink(licensing.alphabet.sourceName ?? "Wikimedia Commons", licensing.alphabet.sourceUrl)
+      );
+    } else {
+      alphabetValue.append("Wikimedia Commons");
+    }
+    appendLicenseLine(fragment, "アルファベット音声", alphabetValue);
+
+    if (state.currentChallenge.audio?.sourceFileName) {
+      appendLicenseLine(fragment, "ファイル", state.currentChallenge.audio.sourceFileName);
+    }
+
+    if (licensing?.alphabet?.note) {
+      const note = document.createElement("p");
+      note.className = "license-note";
+      note.textContent = licensing.alphabet.note;
+      fragment.appendChild(note);
+    }
+  }
+
+  if (state.currentChallenge.kind === "sentence" && licensing?.audio?.faqUrl) {
+    const faq = document.createElement("p");
+    faq.className = "license-note";
+    faq.append("詳細: ");
+    faq.appendChild(createLicenseLink("Tatoeba FAQ", licensing.audio.faqUrl));
+    fragment.appendChild(faq);
+  }
+
+  licenseContentNode.replaceChildren(fragment);
+}
+
 function render() {
   renderStats();
   renderChallengeText();
   renderTimeAttack();
   renderAudioUnlockNotice();
+  renderLicenseInfo();
   renderKeyboard();
   renderSettings();
 }
@@ -1470,6 +1621,7 @@ async function loadDataset() {
     const payload = await response.json();
     state.allSentences = payload.sentences;
     state.alphabetEntries = payload.alphabet ?? CYRILLIC_ALPHABET.map((letter) => ({ letter }));
+    state.datasetMeta = payload;
     state.loading = false;
     buildSentenceQueue();
     buildAlphabetSourceQueue();
