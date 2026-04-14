@@ -1,0 +1,15 @@
+{
+  "cacheDir": ".cache/build-dataset",
+  "forceDownload": false,
+  "sources": {
+    "translationPairsSource": "",
+    "audioSource": "",
+    "tatoebaCustomExportFrom": "rus",
+    "tatoebaCustomExportTo": "jpn",
+    "tatoebaDownloadsPage": "https://tatoeba.org/ja/downloads",
+    "sentencesArchive": "https://downloads.tatoeba.org/exports/sentences.tar.bz2",
+    "linksArchive": "https://downloads.tatoeba.org/exports/links.tar.bz2",
+    "audioArchive": "https://downloads.tatoeba.org/exports/sentences_with_audio.tar.bz2",
+    "alphabetAudioDir": ""
+  }
+}

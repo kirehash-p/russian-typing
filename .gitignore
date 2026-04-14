@@ -1,0 +1,14 @@
+node_modules
+dist
+.cache
+.wrangler
+generated
+public/data
+public/static/audio/alphabet
+dataset.config.json
+data-source/
+corpus/
+*例文の組み合わせ*.tsv
+sentence_pairs*.tsv
+translation_pairs*.tsv
+sentences_with_audio*.csv
