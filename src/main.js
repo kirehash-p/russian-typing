@@ -328,6 +328,7 @@ app.innerHTML = `
         <button id="nextButton" class="icon-button" type="button" aria-label="次の問題へ">↺</button>
         <button id="settingsButton" class="icon-button" type="button" aria-label="設定">⚙</button>
       </div>
+      <div id="hudNotice" class="hud-notice" hidden>音声の自動再生を有効化するために再生ボタンを押してください</div>
       <div class="hud-group hud-stats">
         <div class="metric"><span id="datasetLabel">例文数</span><strong id="datasetCount">-</strong></div>
         <div class="metric"><span>完了</span><strong id="completedCount">0</strong></div>
@@ -393,13 +394,6 @@ app.innerHTML = `
           <button id="timeAttackStartButton" class="start-button" type="button">開始</button>
         </div>
         <div class="sentence-scroll" id="sentenceScroll">
-          <div id="audioUnlockNotice" class="audio-unlock" hidden>
-            <div>
-              <strong>自動再生を有効化してください</strong>
-              <p>ブラウザ制約で音声を自動再生できません。再生ボタンを一度押すと以後の自動再生が有効になります。</p>
-            </div>
-            <button id="audioUnlockButton" class="text-button" type="button">再生する</button>
-          </div>
           <div id="sentenceTrack" class="sentence-track">
             <div id="sentenceDisplay" class="sentence-display"></div>
           </div>
@@ -447,6 +441,7 @@ const datasetLabelNode = document.querySelector("#datasetLabel");
 const datasetCountNode = document.querySelector("#datasetCount");
 const completedCountNode = document.querySelector("#completedCount");
 const mistypedCountNode = document.querySelector("#mistypedCount");
+const hudNoticeNode = document.querySelector("#hudNotice");
 const sentenceScrollNode = document.querySelector("#sentenceScroll");
 const sentenceTrackNode = document.querySelector("#sentenceTrack");
 const sentenceDisplayNode = document.querySelector("#sentenceDisplay");
@@ -466,8 +461,6 @@ const settingShowGuideNode = document.querySelector("#settingShowGuide");
 const sentenceModeBlockNode = document.querySelector("#sentenceModeBlock");
 const alphabetModeBlockNode = document.querySelector("#alphabetModeBlock");
 const timeAttackStripNode = document.querySelector("#timeAttackStrip");
-const audioUnlockNoticeNode = document.querySelector("#audioUnlockNotice");
-const audioUnlockButtonNode = document.querySelector("#audioUnlockButton");
 const gaugeFillNode = document.querySelector("#gaugeFill");
 const timerInfoNode = document.querySelector("#timerInfo");
 const timeAttackStartButtonNode = document.querySelector("#timeAttackStartButton");
@@ -758,8 +751,9 @@ function renderStats() {
 
 function renderAudioUnlockNotice() {
   const hasAudio = Boolean(state.currentChallenge?.audio);
-  audioUnlockNoticeNode.hidden =
-    !state.settings.autoReplay || !hasAudio || !state.needsAudioUnlock;
+  const shouldShow = state.settings.autoReplay && hasAudio && state.needsAudioUnlock;
+  hudNoticeNode.hidden = !shouldShow;
+  replayButtonNode.classList.toggle("needs-attention", shouldShow);
 }
 
 function syncSentenceScrollLayout() {
@@ -768,7 +762,7 @@ function syncSentenceScrollLayout() {
   }
 
   const shouldCenter =
-    audioUnlockNoticeNode.hidden &&
+    hudNoticeNode.hidden &&
     sentenceScrollNode.scrollHeight <= sentenceScrollNode.clientHeight + 1;
 
   sentenceScrollNode.classList.toggle("is-centered", shouldCenter);
@@ -1037,14 +1031,7 @@ function renderLicenseInfo() {
       textLineValue.append(licensing?.text?.sourceName ?? "Tatoeba");
     }
     textLineValue.append(` / ${licensing?.text?.licenseName ?? "CC BY 2.0 FR"}`);
-    appendLicenseLine(fragment, "例文", textLineValue);
-
-    if (licensing?.text?.note) {
-      const note = document.createElement("p");
-      note.className = "license-note";
-      note.textContent = licensing.text.note;
-      fragment.appendChild(note);
-    }
+    appendLicenseLine(fragment, "例文提供", textLineValue);
 
     const sentenceLinkValue = document.createDocumentFragment();
     const sentencePageUrl =
@@ -1055,27 +1042,19 @@ function renderLicenseInfo() {
     );
     appendLicenseLine(fragment, "現在の文", sentenceLinkValue);
 
-    if (licensing?.audioLicensePolicyDescription) {
-      appendLicenseLine(
-        fragment,
-        "音声ポリシー",
-        `${licensing.audioLicensePolicy} / ${licensing.audioLicensePolicyDescription}`
-      );
-    }
-
     const currentAudio = state.currentChallenge.audio;
     if (currentAudio?.kind === "tatoeba") {
       const audioValue = `${currentAudio.username || "Tatoeba user"} / ${
         currentAudio.license || "ライセンス情報なし"
       }`;
-      appendLicenseLine(fragment, "音声", audioValue);
+      appendLicenseLine(fragment, "音声提供", audioValue);
 
       if (currentAudio.attributionUrl) {
         const audioLinkValue = document.createDocumentFragment();
         audioLinkValue.appendChild(
           createLicenseLink("attribution URL", currentAudio.attributionUrl)
         );
-        appendLicenseLine(fragment, "音声帰属", audioLinkValue);
+        appendLicenseLine(fragment, "音声データ", audioLinkValue);
       } else if (currentAudio.id) {
         const audioLinkValue = document.createDocumentFragment();
         audioLinkValue.appendChild(
@@ -1084,7 +1063,7 @@ function renderLicenseInfo() {
             `https://tatoeba.org/audio/download/${currentAudio.id}`
           )
         );
-        appendLicenseLine(fragment, "音声参照", audioLinkValue);
+        appendLicenseLine(fragment, "音声データ", audioLinkValue);
       }
     }
   } else {
@@ -1100,17 +1079,10 @@ function renderLicenseInfo() {
     } else {
       alphabetValue.append("Wikimedia Commons");
     }
-    appendLicenseLine(fragment, "アルファベット音声", alphabetValue);
+      appendLicenseLine(fragment, "音声提供", alphabetValue);
 
     if (state.currentChallenge.audio?.sourceFileName) {
-      appendLicenseLine(fragment, "ファイル", state.currentChallenge.audio.sourceFileName);
-    }
-
-    if (licensing?.alphabet?.note) {
-      const note = document.createElement("p");
-      note.className = "license-note";
-      note.textContent = licensing.alphabet.note;
-      fragment.appendChild(note);
+      appendLicenseLine(fragment, "音声データ", state.currentChallenge.audio.sourceFileName);
     }
   }
 
@@ -1650,12 +1622,6 @@ keyboardNode.addEventListener("click", (event) => {
   const output = mapCodeToOutput(code, state.virtualShift);
   processInput(output, code);
   state.virtualShift = false;
-});
-
-audioUnlockButtonNode.addEventListener("click", () => {
-  soundEngine.ensureContext();
-  focusCaptureSurface();
-  void playCurrentAudio();
 });
 
 async function loadDataset() {

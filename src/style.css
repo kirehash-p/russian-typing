@@ -113,6 +113,18 @@ body::before {
   justify-content: flex-end;
 }
 
+.hud-notice {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--red);
+  font-size: 0.74rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
 .icon-button,
 .text-button {
   height: 38px;
@@ -131,6 +143,11 @@ body::before {
   width: 38px;
   display: grid;
   place-items: center;
+}
+
+.icon-button.needs-attention {
+  animation: replayPulse 1.6s ease-in-out infinite;
+  border-color: rgba(255, 113, 128, 0.72);
 }
 
 .text-button,
@@ -280,31 +297,6 @@ body::before {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.audio-unlock {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(245, 197, 91, 0.34);
-  background:
-    linear-gradient(180deg, rgba(245, 197, 91, 0.12), rgba(245, 197, 91, 0.06)),
-    rgba(255, 255, 255, 0.02);
-}
-
-.audio-unlock strong {
-  display: block;
-  font-size: 0.92rem;
-}
-
-.audio-unlock p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.55;
 }
 
 .gauge {
@@ -473,6 +465,18 @@ body::before {
 
 .license-content a:hover {
   text-decoration: underline;
+}
+
+@keyframes replayPulse {
+  0%,
+  100% {
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 0 0 0 rgba(255, 113, 128, 0);
+  }
+  50% {
+    background: rgba(255, 113, 128, 0.22);
+    box-shadow: 0 0 0 6px rgba(255, 113, 128, 0.08);
+  }
 }
 
 .keyboard-panel {
@@ -657,11 +661,6 @@ body::before {
     font-size: 0.78rem;
   }
 
-  .audio-unlock {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .key {
     min-height: 42px;
     padding: 5px 6px;
@@ -719,6 +718,10 @@ body::before {
 
   .hud {
     gap: 8px;
+  }
+
+  .hud-notice {
+    font-size: 0.66rem;
   }
 
   .sentence-panel {
@@ -783,6 +786,10 @@ body::before {
   .icon-button {
     width: 30px;
     height: 30px;
+  }
+
+  .hud-notice {
+    font-size: 0.58rem;
   }
 
   .sentence-panel {
@@ -921,26 +928,7 @@ body::before {
     font-size: 0.46rem;
   }
 
-  .audio-unlock {
-    flex-direction: row;
-    align-items: center;
-    padding: 6px 8px;
-    gap: 8px;
-  }
-
-  .audio-unlock strong {
-    font-size: 0.76rem;
-  }
-
-  .audio-unlock p {
-    margin-top: 2px;
-    font-size: 0.66rem;
-    line-height: 1.3;
-  }
-
-  .audio-unlock .text-button {
-    height: 30px;
-    padding: 0 10px;
-    flex: 0 0 auto;
+  .hud-notice {
+    font-size: 0.54rem;
   }
 }
