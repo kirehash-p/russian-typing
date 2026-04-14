@@ -302,6 +302,7 @@ const state = {
   lastMissCode: "",
   needsAudioUnlock: false,
   audioLoading: false,
+  pendingAutoReplayUrl: "",
   licenseOpen: false,
   timeAttack: {
     active: false,
@@ -328,16 +329,16 @@ function setAudioLoading(value) {
   renderAudioUnlockNotice();
 }
 
-audioPlayer.addEventListener("loadstart", () => {
-  if (state.settings.autoReplay && state.currentChallenge?.audio) {
-    setAudioLoading(true);
-  }
-});
-
 for (const eventName of ["loadeddata", "canplay", "playing"]) {
   audioPlayer.addEventListener(eventName, () => {
     setAudioLoading(false);
   });
+}
+
+function clearPendingAutoReplay(url = "") {
+  if (!url || state.pendingAutoReplayUrl === url) {
+    state.pendingAutoReplayUrl = "";
+  }
 }
 
 for (const eventName of ["error", "ended"]) {
@@ -1159,12 +1160,13 @@ async function playCurrentAudio() {
   const url = resolveAudioUrl(state.currentChallenge?.audio);
   if (!url) {
     state.needsAudioUnlock = false;
+    clearPendingAutoReplay();
     setAudioLoading(false);
     renderAudioUnlockNotice();
     return true;
   }
-  const preloadEntry = audioPreloadCache.get(url);
-  setAudioLoading(!preloadEntry || preloadEntry.status !== "ready");
+  clearPendingAutoReplay(url);
+  setAudioLoading(false);
   audioPlayer.src = url;
   audioPlayer.currentTime = 0;
   try {
@@ -1180,6 +1182,27 @@ async function playCurrentAudio() {
     }
     return false;
   }
+}
+
+function requestCurrentAudioAutoReplay() {
+  const url = resolveAudioUrl(state.currentChallenge?.audio);
+  if (!url) {
+    clearPendingAutoReplay();
+    setAudioLoading(false);
+    return;
+  }
+
+  const preloadEntry = audioPreloadCache.get(url);
+  if (preloadEntry?.status === "ready") {
+    clearPendingAutoReplay(url);
+    setAudioLoading(false);
+    void playCurrentAudio();
+    return;
+  }
+
+  primeAudio(state.currentChallenge.audio);
+  state.pendingAutoReplayUrl = url;
+  setAudioLoading(true);
 }
 
 function primeAudio(audioSource) {
@@ -1200,6 +1223,14 @@ function primeAudio(audioSource) {
       entry.status = "ready";
       if (resolveAudioUrl(state.currentChallenge?.audio) === url) {
         setAudioLoading(false);
+        if (
+          state.settings.autoReplay &&
+          !state.needsAudioUnlock &&
+          state.pendingAutoReplayUrl === url
+        ) {
+          clearPendingAutoReplay(url);
+          void playCurrentAudio();
+        }
       }
     },
     { once: true }
@@ -1209,6 +1240,7 @@ function primeAudio(audioSource) {
     () => {
       entry.status = "error";
       if (resolveAudioUrl(state.currentChallenge?.audio) === url) {
+        clearPendingAutoReplay(url);
         setAudioLoading(false);
       }
     },
@@ -1238,6 +1270,8 @@ function resetProgress() {
   state.virtualShift = false;
   state.lastMatchCode = "";
   state.lastMissCode = "";
+  clearPendingAutoReplay();
+  setAudioLoading(false);
 }
 
 function buildSentenceQueue() {
@@ -1274,7 +1308,7 @@ function loadNextChallenge({ preserveRun = false } = {}) {
   focusCaptureSurface();
 
   if (state.settings.autoReplay) {
-    void playCurrentAudio();
+    requestCurrentAudioAutoReplay();
   }
 }
 
