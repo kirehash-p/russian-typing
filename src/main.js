@@ -301,6 +301,7 @@ const state = {
   lastMatchCode: "",
   lastMissCode: "",
   needsAudioUnlock: false,
+  licenseOpen: false,
   timeAttack: {
     active: false,
     started: false,
@@ -406,11 +407,8 @@ app.innerHTML = `
           <div class="stage-meta">
             <span id="progressInfo" class="meta-pill">0 / 0</span>
             <span id="modeInfo" class="meta-pill"></span>
+            <button id="licenseButton" class="meta-pill meta-button" type="button">出典</button>
           </div>
-          <details id="licenseDetails" class="license-panel">
-            <summary>ライセンス / 出典</summary>
-            <div id="licenseContent" class="license-content"></div>
-          </details>
         </div>
       </section>
 
@@ -424,6 +422,16 @@ app.innerHTML = `
         <strong>タイムアップ</strong>
         <p id="gameOverSummary" class="game-over-summary"></p>
         <button id="restartTimeAttackButton" class="restart-button" type="button">もう一度</button>
+      </div>
+    </div>
+
+    <div id="licenseOverlay" class="license-overlay" hidden>
+      <div id="licenseDialog" class="license-dialog" role="dialog" aria-modal="true" aria-labelledby="licenseDialogTitle">
+        <div class="license-dialog-head">
+          <strong id="licenseDialogTitle">ライセンス / 出典</strong>
+          <button id="closeLicenseButton" class="text-button" type="button">閉じる</button>
+        </div>
+        <div id="licenseContent" class="license-content"></div>
       </div>
     </div>
   </div>
@@ -445,7 +453,10 @@ const sentenceDisplayNode = document.querySelector("#sentenceDisplay");
 const translationNode = document.querySelector("#translation");
 const progressInfoNode = document.querySelector("#progressInfo");
 const modeInfoNode = document.querySelector("#modeInfo");
-const licenseDetailsNode = document.querySelector("#licenseDetails");
+const licenseButtonNode = document.querySelector("#licenseButton");
+const licenseOverlayNode = document.querySelector("#licenseOverlay");
+const licenseDialogNode = document.querySelector("#licenseDialog");
+const closeLicenseButtonNode = document.querySelector("#closeLicenseButton");
 const licenseContentNode = document.querySelector("#licenseContent");
 const keyboardNode = document.querySelector("#keyboard");
 const settingAutoReplayNode = document.querySelector("#settingAutoReplay");
@@ -662,9 +673,7 @@ function createAlphabetSource() {
 }
 
 function getAlphabetHint() {
-  return state.settings.alphabetMode === "ordered"
-    ? "ロシア語アルファベットを順番に練習します。"
-    : "ロシア語アルファベットをランダムに練習します。";
+  return "";
 }
 
 function hydrateChallenge(source) {
@@ -987,6 +996,10 @@ function renderSettings() {
   alphabetModeBlockNode.hidden = state.settings.practiceMode !== "alphabet";
 }
 
+function renderLicenseModal() {
+  licenseOverlayNode.hidden = !state.licenseOpen;
+}
+
 function createLicenseLink(label, url) {
   const link = document.createElement("a");
   link.href = url;
@@ -1112,12 +1125,18 @@ function renderLicenseInfo() {
   licenseContentNode.replaceChildren(fragment);
 }
 
+function toggleLicenseModal(force) {
+  state.licenseOpen = force ?? !state.licenseOpen;
+  renderLicenseModal();
+}
+
 function render() {
   renderStats();
   renderChallengeText();
   renderTimeAttack();
   renderAudioUnlockNotice();
   renderLicenseInfo();
+  renderLicenseModal();
   renderKeyboard();
   renderSettings();
 }
@@ -1452,6 +1471,13 @@ function handleKeydown(event) {
     }
     return;
   }
+  if (state.licenseOpen) {
+    if (event.key === "Escape") {
+      toggleLicenseModal(false);
+      focusCaptureSurface();
+    }
+    return;
+  }
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return;
   }
@@ -1550,6 +1576,26 @@ settingsButtonNode.addEventListener("click", (event) => {
 closeSettingsButtonNode.addEventListener("click", () => {
   toggleSettings(false);
   focusCaptureSurface();
+});
+
+licenseButtonNode.addEventListener("click", () => {
+  toggleLicenseModal(true);
+});
+
+closeLicenseButtonNode.addEventListener("click", () => {
+  toggleLicenseModal(false);
+  focusCaptureSurface();
+});
+
+licenseOverlayNode.addEventListener("click", (event) => {
+  if (event.target === licenseOverlayNode) {
+    toggleLicenseModal(false);
+    focusCaptureSurface();
+  }
+});
+
+licenseDialogNode.addEventListener("click", (event) => {
+  event.stopPropagation();
 });
 
 restartTimeAttackButtonNode.addEventListener("click", () => {
