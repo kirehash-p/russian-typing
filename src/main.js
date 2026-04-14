@@ -317,9 +317,13 @@ const state = {
 };
 
 const audioPlayer = new Audio();
-audioPlayer.preload = "none";
+audioPlayer.preload = "auto";
 const audioPreloadCache = new Map();
 const soundEngine = new SoundEngine();
+
+function normalizeMediaUrl(url) {
+  return url ? new URL(url, window.location.href).href : "";
+}
 
 function setAudioLoading(value) {
   if (state.audioLoading === value) {
@@ -346,6 +350,20 @@ for (const eventName of ["error", "ended"]) {
     setAudioLoading(false);
   });
 }
+
+audioPlayer.addEventListener("canplay", () => {
+  const currentUrl = resolveAudioUrl(state.currentChallenge?.audio);
+  if (
+    currentUrl &&
+    state.settings.autoReplay &&
+    !state.needsAudioUnlock &&
+    state.pendingAutoReplayUrl === currentUrl &&
+    normalizeMediaUrl(audioPlayer.src) === normalizeMediaUrl(currentUrl)
+  ) {
+    clearPendingAutoReplay(currentUrl);
+    void playCurrentAudio();
+  }
+});
 
 const app = document.querySelector("#app");
 app.innerHTML = `
@@ -1166,12 +1184,14 @@ async function playCurrentAudio() {
     return true;
   }
   clearPendingAutoReplay(url);
-  setAudioLoading(false);
-  audioPlayer.src = url;
+  if (normalizeMediaUrl(audioPlayer.src) !== normalizeMediaUrl(url)) {
+    audioPlayer.src = url;
+  }
   audioPlayer.currentTime = 0;
   try {
     await audioPlayer.play();
     state.needsAudioUnlock = false;
+    setAudioLoading(false);
     renderAudioUnlockNotice();
     return true;
   } catch (error) {
@@ -1192,15 +1212,18 @@ function requestCurrentAudioAutoReplay() {
     return;
   }
 
-  const preloadEntry = audioPreloadCache.get(url);
-  if (preloadEntry?.status === "ready") {
+  if (normalizeMediaUrl(audioPlayer.src) !== normalizeMediaUrl(url)) {
+    audioPlayer.src = url;
+    audioPlayer.load();
+  }
+
+  if (audioPlayer.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
     clearPendingAutoReplay(url);
     setAudioLoading(false);
     void playCurrentAudio();
     return;
   }
 
-  primeAudio(state.currentChallenge.audio);
   state.pendingAutoReplayUrl = url;
   setAudioLoading(true);
 }
@@ -1218,7 +1241,7 @@ function primeAudio(audioSource) {
     status: "loading"
   };
   preloader.addEventListener(
-    "canplaythrough",
+    "canplay",
     () => {
       entry.status = "ready";
       if (resolveAudioUrl(state.currentChallenge?.audio) === url) {
@@ -1251,9 +1274,6 @@ function primeAudio(audioSource) {
 }
 
 function primeUpcomingAudio() {
-  if (state.currentChallenge?.audio) {
-    primeAudio(state.currentChallenge.audio);
-  }
   const upcomingSources =
     state.settings.practiceMode === "sentence"
       ? state.availableSentenceSources.slice(0, 2)
