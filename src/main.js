@@ -301,6 +301,7 @@ const state = {
   lastMatchCode: "",
   lastMissCode: "",
   needsAudioUnlock: false,
+  audioLoading: false,
   licenseOpen: false,
   timeAttack: {
     active: false,
@@ -318,6 +319,32 @@ const audioPlayer = new Audio();
 audioPlayer.preload = "none";
 const audioPreloadCache = new Map();
 const soundEngine = new SoundEngine();
+
+function setAudioLoading(value) {
+  if (state.audioLoading === value) {
+    return;
+  }
+  state.audioLoading = value;
+  renderAudioUnlockNotice();
+}
+
+audioPlayer.addEventListener("loadstart", () => {
+  if (state.settings.autoReplay && state.currentChallenge?.audio) {
+    setAudioLoading(true);
+  }
+});
+
+for (const eventName of ["loadeddata", "canplay", "playing"]) {
+  audioPlayer.addEventListener(eventName, () => {
+    setAudioLoading(false);
+  });
+}
+
+for (const eventName of ["error", "ended"]) {
+  audioPlayer.addEventListener(eventName, () => {
+    setAudioLoading(false);
+  });
+}
 
 const app = document.querySelector("#app");
 app.innerHTML = `
@@ -751,9 +778,20 @@ function renderStats() {
 
 function renderAudioUnlockNotice() {
   const hasAudio = Boolean(state.currentChallenge?.audio);
-  const shouldShow = state.settings.autoReplay && hasAudio && state.needsAudioUnlock;
-  hudNoticeNode.hidden = !shouldShow;
-  replayButtonNode.classList.toggle("needs-attention", shouldShow);
+  const shouldHandle = state.settings.autoReplay && hasAudio;
+  let message = "";
+
+  if (shouldHandle && state.needsAudioUnlock) {
+    message = "音声の自動再生を有効化するために再生ボタンを押してください";
+  } else if (shouldHandle && state.audioLoading) {
+    message = "音声データを読込中です…";
+  }
+
+  hudNoticeNode.hidden = !message;
+  if (message) {
+    hudNoticeNode.textContent = message;
+  }
+  replayButtonNode.classList.toggle("needs-attention", shouldHandle && state.needsAudioUnlock);
 }
 
 function syncSentenceScrollLayout() {
@@ -1121,9 +1159,12 @@ async function playCurrentAudio() {
   const url = resolveAudioUrl(state.currentChallenge?.audio);
   if (!url) {
     state.needsAudioUnlock = false;
+    setAudioLoading(false);
     renderAudioUnlockNotice();
     return true;
   }
+  const preloadEntry = audioPreloadCache.get(url);
+  setAudioLoading(!preloadEntry || preloadEntry.status !== "ready");
   audioPlayer.src = url;
   audioPlayer.currentTime = 0;
   try {
@@ -1134,6 +1175,7 @@ async function playCurrentAudio() {
   } catch (error) {
     if (state.settings.autoReplay) {
       state.needsAudioUnlock = true;
+      setAudioLoading(false);
       renderAudioUnlockNotice();
     }
     return false;
@@ -1148,8 +1190,32 @@ function primeAudio(audioSource) {
   const preloader = new Audio();
   preloader.preload = "auto";
   preloader.src = url;
+  const entry = {
+    audio: preloader,
+    status: "loading"
+  };
+  preloader.addEventListener(
+    "canplaythrough",
+    () => {
+      entry.status = "ready";
+      if (resolveAudioUrl(state.currentChallenge?.audio) === url) {
+        setAudioLoading(false);
+      }
+    },
+    { once: true }
+  );
+  preloader.addEventListener(
+    "error",
+    () => {
+      entry.status = "error";
+      if (resolveAudioUrl(state.currentChallenge?.audio) === url) {
+        setAudioLoading(false);
+      }
+    },
+    { once: true }
+  );
   preloader.load();
-  audioPreloadCache.set(url, preloader);
+  audioPreloadCache.set(url, entry);
 }
 
 function primeUpcomingAudio() {
