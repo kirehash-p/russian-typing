@@ -428,6 +428,11 @@ app.innerHTML = `
           <button class="option-chip" type="button" data-setting-key="alphabetMode" data-setting-value="ordered">順番</button>
         </div>
       </section>
+
+      <p class="settings-credit">
+        制作者：
+        <a href="https://kireha.sh" target="_blank" rel="noreferrer">kirehash</a>
+      </p>
     </aside>
 
     <main class="stage">
