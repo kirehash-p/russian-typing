@@ -5,6 +5,8 @@ dist
 generated
 public/data
 public/static/audio/alphabet
+!public/static/audio/alphabet/
+!public/static/audio/alphabet/*.ogg
 dataset.config.json
 data-source/
 corpus/

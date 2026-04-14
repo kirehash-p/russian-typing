@@ -27,7 +27,7 @@ npm run build
 - `public/static/audio/alphabet/*.ogg`
 - `generated/ru-ja-audio-sentences.tsv`
 
-これらは `.gitignore` 済みです。
+`public/data/sentences.json` と `generated/ru-ja-audio-sentences.tsv` は `.gitignore` 済みです。`public/static/audio/alphabet/*.ogg` は CI での Wikimedia rate limit 回避のため、リポジトリに含めています。
 
 ### デフォルト動作
 
@@ -125,4 +125,4 @@ node scripts/build-dataset.mjs --force-download
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-`CLOUDFLARE_API_TOKEN` には、少なくとも Pages デプロイ可能な権限を持つ Cloudflare API Token を設定してください。プロジェクト名は workflow 内で `russian-typing` に固定しています。
+`CLOUDFLARE_API_TOKEN` には、少なくとも Pages デプロイ可能な権限を持つ Cloudflare API Token を設定してください。プロジェクト名は workflow 内で `rutyping` に固定しています。
