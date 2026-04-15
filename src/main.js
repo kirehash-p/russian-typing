@@ -1065,6 +1065,44 @@ function createLicenseLink(label, url) {
   return link;
 }
 
+function getCreativeCommonsLicenseUrl(licenseName) {
+  const license = String(licenseName ?? "").trim();
+  if (!license) {
+    return "";
+  }
+  if (license === "CC0 1.0") {
+    return "https://creativecommons.org/publicdomain/zero/1.0/";
+  }
+
+  const normalized = license.match(/^CC\s+([A-Z-]+)\s+([0-9.]+)(?:\s+([A-Z]{2}))?$/i);
+  if (!normalized) {
+    return "";
+  }
+
+  const slug = normalized[1].toLowerCase();
+  const version = normalized[2];
+  const locale = normalized[3]?.toLowerCase();
+  return locale
+    ? `https://creativecommons.org/licenses/${slug}/${version}/${locale}/`
+    : `https://creativecommons.org/licenses/${slug}/${version}/`;
+}
+
+function appendTextAndLicenseLink(fragment, sourceLabel, sourceUrl, licenseLabel, licenseUrl) {
+  if (sourceUrl) {
+    fragment.appendChild(createLicenseLink(sourceLabel, sourceUrl));
+  } else {
+    fragment.append(sourceLabel);
+  }
+  if (licenseLabel) {
+    fragment.append(" / ");
+    if (licenseUrl) {
+      fragment.appendChild(createLicenseLink(licenseLabel, licenseUrl));
+    } else {
+      fragment.append(licenseLabel);
+    }
+  }
+}
+
 function appendLicenseLine(container, label, value) {
   const row = document.createElement("p");
   row.className = "license-line";
@@ -1085,14 +1123,13 @@ function renderLicenseInfo() {
 
   if (state.currentChallenge.kind === "sentence") {
     const textLineValue = document.createDocumentFragment();
-    if (licensing?.text?.sourceUrl) {
-      textLineValue.appendChild(
-        createLicenseLink(licensing.text.sourceName ?? "Tatoeba", licensing.text.sourceUrl)
-      );
-    } else {
-      textLineValue.append(licensing?.text?.sourceName ?? "Tatoeba");
-    }
-    textLineValue.append(` / ${licensing?.text?.licenseName ?? "CC BY 2.0 FR"}`);
+    appendTextAndLicenseLink(
+      textLineValue,
+      licensing?.text?.sourceName ?? "Tatoeba",
+      licensing?.text?.sourceUrl,
+      licensing?.text?.licenseName ?? "CC BY 2.0 FR",
+      licensing?.text?.licenseUrl || getCreativeCommonsLicenseUrl(licensing?.text?.licenseName)
+    );
     appendLicenseLine(fragment, "例文提供", textLineValue);
 
     const sentenceLinkValue = document.createDocumentFragment();
@@ -1106,9 +1143,14 @@ function renderLicenseInfo() {
 
     const currentAudio = state.currentChallenge.audio;
     if (currentAudio?.kind === "tatoeba") {
-      const audioValue = `${currentAudio.username || "Tatoeba user"} / ${
-        currentAudio.license || "ライセンス情報なし"
-      }`;
+      const audioValue = document.createDocumentFragment();
+      appendTextAndLicenseLink(
+        audioValue,
+        currentAudio.username || "Tatoeba user",
+        "",
+        currentAudio.license || "ライセンス情報なし",
+        getCreativeCommonsLicenseUrl(currentAudio.license)
+      );
       appendLicenseLine(fragment, "音声提供", audioValue);
 
       if (currentAudio.attributionUrl) {

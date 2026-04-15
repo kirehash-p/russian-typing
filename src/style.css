@@ -889,7 +889,7 @@ body::before {
   }
 
   .stage {
-    grid-template-rows: minmax(0, 1fr) minmax(0, 50svh);
+    grid-template-rows: minmax(0, 1fr) minmax(0, calc(50svh - 40px));
   }
 
   .sentence-panel {
@@ -917,7 +917,7 @@ body::before {
   }
 
   .keyboard-panel {
-    max-height: 50svh;
+    max-height: calc(50svh - 40px);
     padding: 5px 6px 6px;
   }
 
