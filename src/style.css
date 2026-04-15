@@ -923,6 +923,8 @@ body::before {
 
   .keyboard {
     width: 100%;
+    justify-content: flex-start;
+    align-content: flex-start;
     gap: var(--keyboard-gap);
   }
 
@@ -931,17 +933,17 @@ body::before {
   }
 
   .key {
-    min-height: 30px;
-    padding: 2px 3px;
-    border-radius: 8px;
+    min-height: 26px;
+    padding: 1px 2px;
+    border-radius: 7px;
   }
 
   .key-primary {
-    font-size: 0.64rem;
+    font-size: 0.58rem;
   }
 
   .key-secondary {
-    font-size: 0.46rem;
+    font-size: 0.4rem;
   }
 
   .hud-notice {
