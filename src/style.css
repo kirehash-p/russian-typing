@@ -859,66 +859,79 @@ body::before {
 
 @media (orientation: landscape) and (max-height: 620px) {
   :root {
-    --keyboard-gap: 2px;
-    --keyboard-indent-scale: 0.5;
+    --keyboard-gap: 1px;
+    --keyboard-indent-scale: 0.42;
   }
 
   .shell {
-    height: calc(100svh - 10px);
-    width: min(100vw - 10px, 100%);
-    padding: 5px 0;
-    gap: 6px;
+    height: calc(100svh - 4px);
+    width: min(100vw - 4px, 100%);
+    padding: 2px 0;
+    gap: 3px;
   }
 
   .hud {
-    padding: 8px 10px;
+    padding: 4px 6px;
+    border-radius: 12px;
+  }
+
+  .hud-group {
+    gap: 4px;
+  }
+
+  .metric {
+    min-width: 38px;
   }
 
   .metric span {
-    font-size: 0.46rem;
-    margin-bottom: 2px;
+    font-size: 0.42rem;
+    margin-bottom: 1px;
+    letter-spacing: 0.02em;
   }
 
   .metric strong {
-    font-size: 0.76rem;
+    font-size: 0.68rem;
   }
 
   .icon-button {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
   }
 
   .stage {
-    grid-template-rows: minmax(0, 1fr) minmax(0, calc(50svh - 40px));
+    gap: 3px;
+    grid-template-rows: minmax(0, 1fr) minmax(0, calc(50svh - 44px));
   }
 
   .sentence-panel {
-    padding: 10px 12px 8px;
-    gap: 8px;
+    padding: 6px 8px 4px;
+    gap: 4px;
+    border-radius: 14px;
   }
 
   .sentence-scroll {
-    gap: 8px;
+    gap: 4px;
   }
 
   .sentence-display {
-    font-size: clamp(1rem, 2.2vw, 1.45rem);
+    font-size: clamp(0.9rem, 2vw, 1.3rem);
   }
 
   .translation {
-    font-size: 0.82rem;
-    line-height: 1.35;
+    font-size: 0.72rem;
+    line-height: 1.2;
   }
 
   .meta-pill {
-    height: 24px;
-    padding: 0 8px;
-    font-size: 0.7rem;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 0.62rem;
   }
 
   .keyboard-panel {
-    max-height: calc(50svh - 40px);
-    padding: 5px 6px 6px;
+    max-height: calc(50svh - 44px);
+    padding: 2px 3px 3px;
+    border-radius: 14px;
   }
 
   .keyboard {
@@ -933,20 +946,20 @@ body::before {
   }
 
   .key {
-    min-height: 26px;
-    padding: 1px 2px;
-    border-radius: 7px;
+    min-height: 22px;
+    padding: 1px 1px;
+    border-radius: 6px;
   }
 
   .key-primary {
-    font-size: 0.58rem;
+    font-size: 0.52rem;
   }
 
   .key-secondary {
-    font-size: 0.4rem;
+    font-size: 0.34rem;
   }
 
   .hud-notice {
-    font-size: 0.54rem;
+    font-size: 0.48rem;
   }
 }
